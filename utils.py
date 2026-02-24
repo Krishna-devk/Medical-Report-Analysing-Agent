@@ -71,10 +71,6 @@ GEMINI_API_KEY = config.GEMINI_API_KEY
 GEMINI_MODEL   = config.GEMINI_MODEL
 
 client = genai.Client(api_key=GEMINI_API_KEY)
-gemini = GEMINI_MODEL
-
-client = genai.Client(api_key=GEMINI_API_KEY)
-gemini = GEMINI_MODEL
 
 def call_gemini(prompt: str) -> dict:
     """
@@ -83,32 +79,38 @@ def call_gemini(prompt: str) -> dict:
     """
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=GEMINI_MODEL,
             contents=types.Part.from_text(text=prompt),
             config=types.GenerateContentConfig(
-                temperature=0,
+                temperature=0.0, # low temperature for strict factual extraction
                 top_p=0.95,
                 top_k=20,
+                response_mime_type="application/json", # Native JSON structured output
             ),
         )
         if not response.text:
             raise ValueError("Model returned no text output")
+            
         text = response.text.strip()
-        text = re.sub(r'^```json\s*', '', text, flags=re.MULTILINE)
+        # Even with JSON mode, occasionally there are wrapping artifacts depending on model behavior
+        text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.MULTILINE)
         text = re.sub(r'^```\s*', '', text, flags=re.MULTILINE)
         text = text.strip()
+        
         return json.loads(text)
 
     except json.JSONDecodeError as e:
-        # Try to extract JSON from response
+        # Fallback regex extraction if pure JSON load fails
+        import traceback
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
             try:
                 return json.loads(match.group())
             except Exception:
                 pass
-        return {"error": f"Could not parse Gemini response: {str(e)}", "raw": text[:500]}
+        return {"error": f"Could not parse Gemini response: {str(e)}", "raw": text[:500], "trace": traceback.format_exc()}
 
     except Exception as e:
-        return {"error": f"Gemini API error: {str(e)}"}
+        import traceback
+        return {"error": f"Gemini API error: {str(e)}", "trace": traceback.format_exc()}
 

@@ -1,15 +1,21 @@
 import json
 def build_lab_only_prompt(report_text: str) -> str:
-    return f"""You are QuickCare AI. Extract ALL lab test results from this medical report.
-For each result, classify severity using standard medical reference ranges.
-Return ONLY valid JSON, no markdown.
+    return f"""You are QuickCare AI, an expert clinical pathologist and lab results analyzer.
+Extract ALL lab test results from this medical report.
+
+CRITICAL INSTRUCTIONS:
+1. Return ONLY a valid JSON object. No markdown formatting (e.g. ```json), no explanations, no preamble.
+2. Standardize units where possible.
+3. Handle OCR errors gracefully (e.g., if a number looks garbled but context is clear, extract the likely value, or use null if unreadable).
+4. If a parameter is not found, do not hallucinate it.
+5. Emphasize critical alerts for any value far outside normal range.
 
 REPORT:
 \"\"\"
 {report_text[:5000]}
 \"\"\"
 
-Return:
+Return exactly this JSON format:
 {{
   "findings": [
     {{
@@ -34,17 +40,22 @@ Return:
 
 
 def build_risk_only_prompt(report_text: str, extra: dict) -> str:
-    return f"""You are QuickCare AI. Assess patient risk from this medical report.
-Return ONLY valid JSON, no markdown.
+    return f"""You are QuickCare AI, a chief medical data scientist specializing in patient risk stratification.
+Assess patient risk from this medical report.
 
-Extra info: {json.dumps(extra)}
+CRITICAL INSTRUCTIONS:
+1. Return ONLY a valid JSON object. No markdown formatting, no explanations.
+2. Base the risk strictly on the clinical evidence in the text.
+3. If age > 65 or previous admissions > 0, inherently increase readmission risk.
+
+Extra info provided by user: {json.dumps(extra)}
 
 REPORT:
 \"\"\"
 {report_text[:5000]}
 \"\"\"
 
-Return:
+Return exactly this JSON format:
 {{
   "readmission_risk_percent": 0,
   "complication_risk_percent": 0,
@@ -64,13 +75,16 @@ Return:
 
 
 def build_chat_prompt(question: str) -> str:
-    return f"""You are QuickCare AI, a clinical intelligence assistant for doctors and hospital staff.
-Answer the following medical question clearly and concisely.
-Return ONLY valid JSON with key "answer".
+    return f"""You are QuickCare AI, a highly knowledgeable and concise clinical intelligence assistant for doctors and hospital staff.
+Answer the following medical question clearly, relying on established medical guidelines.
+
+CRITICAL INSTRUCTIONS:
+1. Return ONLY a valid JSON object. No markdown formatting.
+2. The answer should be actionable and direct.
 
 Question: {question}
 
-Return: {{"answer": "your detailed answer here"}}"""
+Return exactly this JSON format: {{"answer": "your detailed answer here"}}"""
 
 
 
@@ -83,9 +97,14 @@ def build_full_analysis_prompt(report_text: str, patient_extra: dict) -> str:
     if patient_extra.get("prev_admissions"):
         extra_info += f"\nPrevious Admissions: {patient_extra['prev_admissions']}"
 
-    return f"""You are QuickCare AI, an expert clinical intelligence system used by hospital doctors.
-Analyze the following patient medical report carefully and return a single valid JSON object.
-Do NOT include any explanation, markdown formatting, or text outside the JSON.
+    return f"""You are QuickCare AI, an expert clinical intelligence system assisting hospital doctors.
+Analyze the following patient medical report carefully.
+
+CRITICAL INSTRUCTIONS:
+1. Return ONLY a valid JSON object. Do not include any explanation, markdown formatting, or text outside the JSON.
+2. If information is not present, use sensible defaults (`null` for numbers/objects, "Not mentioned" for strings).
+3. Handle OCR artifacts intelligently. If a unit or number is slightly mangled but obvious to a medical professional, extract the intended meaning.
+4. Ensure all lab severities (Normal/Mild/Moderate/Critical) correlate accurately with the reported value versus normal range.
 
 {extra_info}
 
@@ -94,8 +113,7 @@ PATIENT MEDICAL REPORT:
 {report_text[:5000]}
 \"\"\"
 
-Return this EXACT JSON structure. Fill every field based on the report content.
-If information is not present, use sensible defaults (null for numbers, "Not mentioned" for strings).
+Return this EXACT JSON structure dynamically filled based on the report.
 
 {{
   "patient_info": {{
@@ -166,15 +184,18 @@ If information is not present, use sensible defaults (null for numbers, "Not men
 
 
 def build_summary_only_prompt(report_text: str) -> str:
-    return f"""You are QuickCare AI. Extract a clean patient summary from this medical report.
-Return ONLY valid JSON, no markdown, no explanation.
+    return f"""You are QuickCare AI, a clinical triaging specialist. Extract a clean, precise patient summary from this medical report.
+
+CRITICAL INSTRUCTIONS:
+1. Return ONLY a valid JSON object. No markdown formatting, no explanations.
+2. Synthesize long paragraphs into concise, actionable medical statements.
 
 REPORT:
 \"\"\"
 {report_text[:5000]}
 \"\"\"
 
-Return:
+Return exactly this JSON format:
 {{
   "patient_info": {{
     "name": "string",
